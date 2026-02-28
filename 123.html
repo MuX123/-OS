@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="zh-TW" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>班表系統</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+    
+    * {
+      font-family: 'Noto Sans TC', sans-serif;
+    }
+    
+    .schedule-cell {
+      min-width: 28px;
+      height: 28px;
+      font-size: 11px;
+    }
+    
+    .schedule-header {
+      min-width: 28px;
+      height: 24px;
+      font-size: 10px;
+    }
+    
+    .color-picker-wrapper {
+      position: relative;
+    }
+    
+    .color-picker-wrapper input[type="color"] {
+      width: 40px;
+      height: 30px;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+    }
+    
+    .modal-overlay {
+      background: rgba(0, 0, 0, 0.5);
+    }
+    
+    .schedule-table {
+      border-collapse: collapse;
+    }
+    
+    .schedule-table td, .schedule-table th {
+      border: 1px solid #d1d5db;
+    }
+    
+    .name-cell {
+      min-width: 70px;
+      max-width: 70px;
+    }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full bg-gray-100">
+  <div id="app" class="h-full overflow-auto"><!-- Navigation -->
+   <nav class="bg-indigo-600 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4">
+     <div class="flex items-center justify-between h-14">
+      <div class="flex items-center space-x-4"><button id="nav-home" class="px-4 py-2 rounded-lg bg-indigo-700 hover:bg-indigo-800 transition font-medium">首頁</button> <button id="nav-settings" class="px-4 py-2 rounded-lg hover:bg-indigo-700 transition font-medium">設定</button>
+      </div>
+      <div id="top-controls" class="flex items-center space-x-2"><select id="dept-selector" class="bg-white text-gray-800 px-3 py-1.5 rounded text-sm font-medium"></select> <button id="btn-add-monthly-staff" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded text-sm font-medium transition">增加出勤人員</button>
+      </div>
+     </div>
+    </div>
+   </nav><!-- Home Page -->
+   <div id="home-page" class="p-4"><!-- Department Header -->
+    <div id="dept-header" class="text-center mb-4">
+     <h1 id="dept-name-display" class="text-2xl font-bold text-gray-800"></h1>
+     <p id="dept-phone-display" class="text-lg text-gray-600"></p>
+    </div><!-- Month Navigation -->
+    <div class="flex justify-center items-center space-x-4 mb-4"><button id="prev-month" class="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded transition">◀ 上月</button> <span id="current-month" class="text-lg font-bold text-gray-800"></span> <button id="next-month" class="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded transition">下月 ▶</button>
+    </div><!-- Schedule Table -->
+    <div class="bg-white rounded-lg shadow overflow-x-auto mb-4">
+     <table id="schedule-table" class="schedule-table w-full">
+      <thead id="schedule-header"></thead>
+      <tbody id="schedule-body"></tbody>
+     </table>
+    </div><!-- Bottom Section: Contact, Work Status, Notes -->
+    <div class="grid grid-cols-12 gap-4"><!-- Contact Info -->
+     <div class="col-span-2 bg-white rounded-lg shadow p-3">
+      <h3 class="text-base font-bold text-gray-800 mb-2 border-b pb-1">聯絡方式</h3>
+      <div id="contact-list" class="space-y-1 text-sm"></div>
+     </div><!-- Work Status -->
+     <div class="col-span-3 bg-white rounded-lg shadow p-3">
+      <h3 class="text-base font-bold text-gray-800 mb-2 border-b pb-1">上班情況</h3>
+      <div id="work-status-list" class="space-y-1 text-sm"></div>
+     </div><!-- Notes -->
+     <div class="col-span-7 bg-white rounded-lg shadow p-3">
+      <h3 class="text-base font-bold text-gray-800 mb-2 border-b pb-1">備註欄</h3><textarea id="notes-area" class="w-full h-32 border rounded p-2 text-sm resize-none" placeholder="輸入備註..."></textarea>
+     </div>
+    </div><!-- Export Button -->
+    <div class="mt-4 text-center"><button id="export-csv" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-medium transition"> 匯出 CSV </button>
+    </div>
+   </div><!-- Settings Page -->
+   <div id="settings-page" class="p-4 hidden">
+    <div class="max-w-4xl mx-auto space-y-6"><!-- Department Settings -->
+     <div class="bg-white rounded-lg shadow p-4">
+      <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">部門設定</h2>
+      <div class="flex space-x-2 mb-4"><input type="text" id="new-dept-name" placeholder="部門名稱" class="flex-1 border rounded px-3 py-2"> <input type="text" id="new-dept-phone" placeholder="部門電話" class="flex-1 border rounded px-3 py-2"> <button id="add-dept" class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded transition">新增部門</button>
+      </div>
+      <div id="dept-list" class="space-y-2"></div>
+     </div><!-- Staff Settings -->
+     <div class="bg-white rounded-lg shadow p-4">
+      <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">工作人員設定</h2>
+      <div class="flex space-x-2 mb-4"><select id="staff-dept-select" class="border rounded px-3 py-2"> <option value="">選擇部門</option> </select> <input type="text" id="new-staff-position" placeholder="職位" class="flex-1 border rounded px-3 py-2"> <input type="text" id="new-staff-name" placeholder="姓名" class="flex-1 border rounded px-3 py-2"> <input type="text" id="new-staff-phone" placeholder="電話" class="flex-1 border rounded px-3 py-2"> <button id="add-staff" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition">新增人員</button>
+      </div>
+      <div id="staff-list" class="space-y-2"></div>
+     </div><!-- Status Settings -->
+     <div class="bg-white rounded-lg shadow p-4">
+      <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">狀態設定</h2>
+      <div class="flex space-x-2 mb-4"><input type="text" id="new-status-name" placeholder="狀態名稱" class="flex-1 border rounded px-3 py-2">
+       <div class="color-picker-wrapper flex items-center"><span class="mr-2 text-sm">顏色:</span> <input type="color" id="new-status-color" value="#ff9999">
+       </div><button id="add-status" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded transition">新增狀態</button>
+      </div>
+      <div id="status-list" class="space-y-2"></div>
+     </div><!-- Weekend Color Settings -->
+     <div class="bg-white rounded-lg shadow p-4">
+      <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">週末底色設定</h2>
+      <div class="flex space-x-8">
+       <div class="flex items-center space-x-3"><span class="font-medium">星期六:</span> <input type="color" id="saturday-color" value="#e6f3ff" class="w-12 h-8 cursor-pointer">
+       </div>
+       <div class="flex items-center space-x-3"><span class="font-medium">星期日:</span> <input type="color" id="sunday-color" value="#ffe6e6" class="w-12 h-8 cursor-pointer">
+       </div>
+      </div>
+     </div><!-- Holiday Settings -->
+     <div class="bg-white rounded-lg shadow p-4">
+      <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">特殊節日設定</h2>
+      <div class="mb-4"><textarea id="holiday-input" class="w-full border rounded px-3 py-2 h-24" placeholder="輸入格式：2025/1/1	2025元旦
+每行一筆，日期與名稱用Tab分隔"></textarea>
+       <div class="flex space-x-2 mt-2">
+        <div class="color-picker-wrapper flex items-center"><span class="mr-2 text-sm">節日底色:</span> <input type="color" id="holiday-color" value="#ffeb3b">
+        </div><button id="add-holidays" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded transition">批次新增節日</button>
+       </div>
+      </div>
+      <div id="holiday-list" class="space-y-2"></div>
+     </div>
+    </div>
+   </div><!-- Monthly Staff Modal -->
+   <div id="monthly-staff-modal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-96 max-h-96 overflow-y-auto">
+     <h3 class="text-lg font-bold mb-4">選擇出勤人員</h3>
+     <div id="monthly-staff-list" class="space-y-2 mb-4"></div>
+     <div class="flex justify-end space-x-2"><button id="close-monthly-modal" class="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded transition">取消</button> <button id="save-monthly-staff" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition">確定</button>
+     </div>
+    </div>
+   </div><!-- Status Selection Modal -->
+   <div id="status-modal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-xl p-4 w-64">
+     <h3 class="text-base font-bold mb-3">選擇狀態</h3>
+     <div id="status-options" class="space-y-2 mb-3"></div><button id="close-status-modal" class="w-full bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded transition">取消</button>
+    </div>
+   </div><!-- Edit Staff Modal -->
+   <div id="edit-staff-modal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-96">
+     <h3 class="text-lg font-bold mb-4">編輯人員</h3><input type="hidden" id="edit-staff-id">
+     <div class="space-y-3"><input type="text" id="edit-staff-position" placeholder="職位" class="w-full border rounded px-3 py-2"> <input type="text" id="edit-staff-name" placeholder="姓名" class="w-full border rounded px-3 py-2"> <input type="text" id="edit-staff-phone" placeholder="電話" class="w-full border rounded px-3 py-2">
+     </div>
+     <div class="flex justify-end space-x-2 mt-4"><button id="close-edit-modal" class="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded transition">取消</button> <button id="save-edit-staff" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition">儲存</button>
+     </div>
+    </div>
+   </div>
+  </div>
+  <script>
+    // Initialize Element SDK
+    const defaultConfig = {
+      primary_color: '#4f46e5',
+      text_color: '#1f2937',
+      background_color: '#f3f4f6'
+    };
+
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange: async (config) => {},
+        mapToCapabilities: (config) => ({
+          recolorables: [],
+          borderables: [],
+          fontEditable: undefined,
+          fontSizeable: undefined
+        }),
+        mapToEditPanelValues: (config) => new Map()
+      });
+    }
+
+    // Data Storage
+    let data = {
+      departments: [],
+      staff: [],
+      statuses: [
+        { id: '1', name: '病', color: '#ffcdd2' },
+        { id: '2', name: '休', color: '#c8e6c9' },
+        { id: '3', name: '事', color: '#fff9c4' },
+        { id: '4', name: '代', color: '#bbdefb' }
+      ],
+      holidays: [],
+      saturdayColor: '#e6f3ff',
+      sundayColor: '#ffe6e6',
+      holidayColor: '#ffeb3b',
+      monthlyStaff: {},
+      scheduleData: {},
+      notes: {}
+    };
+
+    let currentYear = new Date().getFullYear();
+    let currentMonth = new Date().getMonth();
+    let currentDeptId = null;
+    let selectedCellInfo = null;
+
+    // Load from localStorage
+    function loadData() {
+      const saved = localStorage.getItem('shiftScheduleData');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        data = { ...data, ...parsed };
+      }
+    }
+
+    // Save to localStorage
+    function saveData() {
+      localStorage.setItem('shiftScheduleData', JSON.stringify(data));
+    }
+
+    // Generate unique ID
+    function generateId() {
+      return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+
+    // Get days in month
+    function getDaysInMonth(year, month) {
+      return new Date(year, month + 1, 0).getDate();
+    }
+
+    // Get day of week (0=Sunday)
+    function getDayOfWeek(year, month, day) {
+      return new Date(year, month, day).getDay();
+    }
+
+    // Format month key
+    function getMonthKey() {
+      return `${currentYear}-${currentMonth}`;
+    }
+
+    // Navigation
+    document.getElementById('nav-home').addEventListener('click', () => {
+      document.getElementById('home-page').classList.remove('hidden');
+      document.getElementById('settings-page').classList.add('hidden');
+      document.getElementById('nav-home').classList.add('bg-indigo-700');
+      document.getElementById('nav-settings').classList.remove('bg-indigo-700');
+      document.getElementById('top-controls').classList.remove('hidden');
+      renderSchedule();
+    });
+
+    document.getElementById('nav-settings').addEventListener('click', () => {
+      document.getElementById('settings-page').classList.remove('hidden');
+      document.getElementById('home-page').classList.add('hidden');
+      document.getElementById('nav-settings').classList.add('bg-indigo-700');
+      document.getElementById('nav-home').classList.remove('bg-indigo-700');
+      document.getElementById('top-controls').classList.add('hidden');
+      renderSettings();
+    });
+
+    // Month navigation
+    document.getElementById('prev-month').addEventListener('click', () => {
+      currentMonth--;
+      if (currentMonth < 0) {
+        currentMonth = 11;
+        currentYear--;
+      }
+      renderSchedule();
+    });
+
+    document.getElementById('next-month').addEventListener('click', () => {
+      currentMonth++;
+      if (currentMonth > 11) {
+        currentMonth = 0;
+        currentYear++;
+      }
+      renderSchedule();
+    });
+
+    // Department selector
+    document.getElementById('dept-selector').addEventListener('change', (e) => {
+      currentDeptId = e.target.value || null;
+      renderSchedule();
+    });
+
+    // Render department selector
+    function renderDeptSelector() {
+      const selector = document.getElementById('dept-selector');
+      const staffDeptSelect = document.getElementById('staff-dept-select');
+      
+      selector.innerHTML = '<option value="">選擇部門</option>' + 
+        data.departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+      
+      staffDeptSelect.innerHTML = '<option value="">選擇部門</option>' + 
+        data.departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+      
+      if (currentDeptId && !data.departments.find(d => d.id === currentDeptId)) {
+        currentDeptId = data.departments.length > 0 ? data.departments[0].id : null;
+      }
+      
+      if (currentDeptId) {
+        selector.value = currentDeptId;
+      }
+    }
+
+    // Render schedule
+    function renderSchedule() {
+      const headerEl = document.getElementById('schedule-header');
+      const bodyEl = document.getElementById('schedule-body');
+      const monthLabel = document.getElementById('current-month');
+      const deptNameDisplay = document.getElementById('dept-name-display');
+      const deptPhoneDisplay = document.getElementById('dept-phone-display');
+      
+      monthLabel.textContent = `${currentYear}年 ${currentMonth + 1}月`;
+      
+      // Display department info
+      const currentDept = data.departments.find(d => d.id === currentDeptId);
+      if (currentDept) {
+        deptNameDisplay.textContent = currentDept.name;
+        deptPhoneDisplay.textContent = currentDept.phone || '';
+      } else {
+        deptNameDisplay.textContent = '請選擇部門';
+        deptPhoneDisplay.textContent = '';
+      }
+      
+      const daysInMonth = getDaysInMonth(currentYear, currentMonth);
+      const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+      
+      // Header
+      let headerHtml = '<tr><th class="schedule-header bg-gray-100 name-cell sticky left-0 z-10">姓名</th>';
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dow = getDayOfWeek(currentYear, currentMonth, d);
+        const dateStr = `${currentYear}/${currentMonth + 1}/${d}`;
+        const holiday = data.holidays.find(h => h.date === dateStr);
+        
+        let bgColor = '';
+        if (holiday) {
+          bgColor = data.holidayColor;
+        } else if (dow === 6) {
+          bgColor = data.saturdayColor;
+        } else if (dow === 0) {
+          bgColor = data.sundayColor;
+        }
+        
+        headerHtml += `<th class="schedule-header text-center" style="background-color: ${bgColor}">
+          <div class="text-xs">${d}</div>
+          <div class="text-xs text-gray-500">${weekdays[dow]}</div>
+        </th>`;
+      }
+      headerHtml += '</tr>';
+      headerEl.innerHTML = headerHtml;
+      
+      // Body
+      const monthKey = getMonthKey();
+      const monthlyStaffIds = data.monthlyStaff[monthKey] || [];
+      const deptStaff = data.staff.filter(s => s.deptId === currentDeptId && monthlyStaffIds.includes(s.id));
+      
+      let bodyHtml = '';
+      deptStaff.forEach(staff => {
+        bodyHtml += `<tr>
+          <td class="schedule-cell bg-gray-50 name-cell sticky left-0 z-10 font-medium truncate px-1">${staff.name}</td>`;
+        
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dow = getDayOfWeek(currentYear, currentMonth, d);
+          const dateStr = `${currentYear}/${currentMonth + 1}/${d}`;
+          const holiday = data.holidays.find(h => h.date === dateStr);
+          const cellKey = `${monthKey}-${staff.id}-${d}`;
+          const cellData = data.scheduleData[cellKey];
+          
+          let bgColor = '';
+          let cellContent = '';
+          
+          if (cellData) {
+            const status = data.statuses.find(s => s.id === cellData.statusId);
+            if (status) {
+              bgColor = status.color;
+              cellContent = status.name;
+            }
+          } else {
+            if (holiday) {
+              bgColor = data.holidayColor;
+            } else if (dow === 6) {
+              bgColor = data.saturdayColor;
+            } else if (dow === 0) {
+              bgColor = data.sundayColor;
+            }
+          }
+          
+          bodyHtml += `<td class="schedule-cell text-center cursor-pointer hover:opacity-80 transition" 
+            style="background-color: ${bgColor}" 
+            data-staff="${staff.id}" data-day="${d}">${cellContent}</td>`;
+        }
+        bodyHtml += '</tr>';
+      });
+      
+      bodyEl.innerHTML = bodyHtml;
+      
+      // Add click handlers for cells
+      bodyEl.querySelectorAll('td[data-staff]').forEach(cell => {
+        cell.addEventListener('click', () => {
+          selectedCellInfo = {
+            staffId: cell.dataset.staff,
+            day: parseInt(cell.dataset.day)
+          };
+          showStatusModal();
+        });
+      });
+      
+      renderContactList(deptStaff);
+      renderWorkStatus(deptStaff);
+      loadNotes();
+    }
+
+    // Render contact list
+    function renderContactList(staffList) {
+      const container = document.getElementById('contact-list');
+      container.innerHTML = staffList.map(s => 
+        `<div class="truncate">${s.name} ${s.phone || ''}</div>`
+      ).join('');
+    }
+
+    // Render work status
+    function renderWorkStatus(staffList) {
+      const container = document.getElementById('work-status-list');
+      const monthKey = getMonthKey();
+      const daysInMonth = getDaysInMonth(currentYear, currentMonth);
+      
+      let html = '';
+      staffList.forEach(staff => {
+        const statusCounts = {};
+        data.statuses.forEach(s => statusCounts[s.id] = 0);
+        
+        for (let d = 1; d <= daysInMonth; d++) {
+          const cellKey = `${monthKey}-${staff.id}-${d}`;
+          const cellData = data.scheduleData[cellKey];
+          if (cellData && cellData.statusId) {
+            statusCounts[cellData.statusId]++;
+          }
+        }
+        
+        let totalOffDays = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+        let workDays;
+        
+        // Check if position contains "代班"
+        if (staff.position && staff.position.includes('代班')) {
+          // For substitute workers, work days = status counts
+          const substituteStatus = data.statuses.find(s => s.name === '代');
+          workDays = substituteStatus ? statusCounts[substituteStatus.id] : totalOffDays;
+        } else {
+          workDays = daysInMonth - totalOffDays;
+        }
+        
+        const statusSummary = data.statuses
+          .filter(s => statusCounts[s.id] > 0)
+          .map(s => `${s.name}:${statusCounts[s.id]}`)
+          .join(' ');
+        
+        html += `<div class="truncate">${staff.name} ${statusSummary} 上班:${workDays}天</div>`;
+      });
+      
+      container.innerHTML = html;
+    }
+
+    // Load notes
+    function loadNotes() {
+      const monthKey = getMonthKey();
+      const deptKey = `${currentDeptId}-${monthKey}`;
+      document.getElementById('notes-area').value = data.notes[deptKey] || '';
+    }
+
+    // Save notes
+    document.getElementById('notes-area').addEventListener('input', (e) => {
+      const monthKey = getMonthKey();
+      const deptKey = `${currentDeptId}-${monthKey}`;
+      data.notes[deptKey] = e.target.value;
+      saveData();
+    });
+
+    // Show status modal
+    function showStatusModal() {
+      const modal = document.getElementById('status-modal');
+      const optionsContainer = document.getElementById('status-options');
+      
+      let html = `<button class="w-full text-left px-3 py-2 rounded hover:bg-gray-100 transition" data-status="">清除</button>`;
+      data.statuses.forEach(status => {
+        html += `<button class="w-full text-left px-3 py-2 rounded hover:bg-gray-100 transition flex items-center" data-status="${status.id}">
+          <span class="w-4 h-4 rounded mr-2" style="background-color: ${status.color}"></span>
+          ${status.name}
+        </button>`;
+      });
+      
+      optionsContainer.innerHTML = html;
+      
+      optionsContainer.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          setStatus(btn.dataset.status);
+          modal.classList.add('hidden');
+        });
+      });
+      
+      modal.classList.remove('hidden');
+    }
+
+    // Set status
+    function setStatus(statusId) {
+      if (!selectedCellInfo) return;
+      
+      const monthKey = getMonthKey();
+      const cellKey = `${monthKey}-${selectedCellInfo.staffId}-${selectedCellInfo.day}`;
+      
+      if (statusId) {
+        data.scheduleData[cellKey] = { statusId };
+      } else {
+        delete data.scheduleData[cellKey];
+      }
+      
+      saveData();
+      renderSchedule();
+    }
+
+    document.getElementById('close-status-modal').addEventListener('click', () => {
+      document.getElementById('status-modal').classList.add('hidden');
+    });
+
+    // Monthly staff modal
+    document.getElementById('btn-add-monthly-staff').addEventListener('click', () => {
+      if (!currentDeptId) {
+        const toast = document.createElement('div');
+        toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow-lg z-50';
+        toast.textContent = '請先選擇部門';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
+        return;
+      }
+      
+      const modal = document.getElementById('monthly-staff-modal');
+      const container = document.getElementById('monthly-staff-list');
+      const monthKey = getMonthKey();
+      const selectedIds = data.monthlyStaff[monthKey] || [];
+      
+      const deptStaff = data.staff.filter(s => s.deptId === currentDeptId);
+      
+      container.innerHTML = deptStaff.map(s => `
+        <label class="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
+          <input type="checkbox" value="${s.id}" ${selectedIds.includes(s.id) ? 'checked' : ''} class="w-4 h-4">
+          <span>${s.position ? `[${s.position}]` : ''} ${s.name}</span>
+        </label>
+      `).join('');
+      
+      modal.classList.remove('hidden');
+    });
+
+    document.getElementById('close-monthly-modal').addEventListener('click', () => {
+      document.getElementById('monthly-staff-modal').classList.add('hidden');
+    });
+
+    document.getElementById('save-monthly-staff').addEventListener('click', () => {
+      const monthKey = getMonthKey();
+      const checkboxes = document.querySelectorAll('#monthly-staff-list input[type="checkbox"]:checked');
+      data.monthlyStaff[monthKey] = Array.from(checkboxes).map(cb => cb.value);
+      saveData();
+      document.getElementById('monthly-staff-modal').classList.add('hidden');
+      renderSchedule();
+    });
+
+    // Settings rendering
+    function renderSettings() {
+      renderDeptList();
+      renderStaffList();
+      renderStatusList();
+      renderHolidayList();
+      renderDeptSelector();
+      
+      document.getElementById('saturday-color').value = data.saturdayColor;
+      document.getElementById('sunday-color').value = data.sundayColor;
+      document.getElementById('holiday-color').value = data.holidayColor;
+    }
+
+    // Department list
+    function renderDeptList() {
+      const container = document.getElementById('dept-list');
+      container.innerHTML = data.departments.map(d => `
+        <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
+          <span><strong>${d.name}</strong> ${d.phone || ''}</span>
+          <button class="text-red-500 hover:text-red-700 px-2" data-delete-dept="${d.id}">刪除</button>
+        </div>
+      `).join('');
+      
+      container.querySelectorAll('[data-delete-dept]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          data.departments = data.departments.filter(d => d.id !== btn.dataset.deleteDept);
+          saveData();
+          renderSettings();
+          renderDeptSelector();
+        });
+      });
+    }
+
+    // Add department
+    document.getElementById('add-dept').addEventListener('click', () => {
+      const name = document.getElementById('new-dept-name').value.trim();
+      const phone = document.getElementById('new-dept-phone').value.trim();
+      
+      if (name) {
+        data.departments.push({ id: generateId(), name, phone });
+        saveData();
+        document.getElementById('new-dept-name').value = '';
+        document.getElementById('new-dept-phone').value = '';
+        renderSettings();
+        renderDeptSelector();
+      }
+    });
+
+    // Staff list
+    function renderStaffList() {
+      const container = document.getElementById('staff-list');
+      container.innerHTML = data.staff.map(s => {
+        const dept = data.departments.find(d => d.id === s.deptId);
+        return `
+          <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
+            <span>${dept ? `[${dept.name}]` : ''} ${s.position ? `${s.position}` : ''} ${s.name} ${s.phone || ''}</span>
+            <div class="flex space-x-2">
+              <button class="text-blue-500 hover:text-blue-700 px-2" data-edit-staff="${s.id}">編輯</button>
+              <button class="text-red-500 hover:text-red-700 px-2" data-delete-staff="${s.id}">刪除</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      container.querySelectorAll('[data-delete-staff]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          data.staff = data.staff.filter(s => s.id !== btn.dataset.deleteStaff);
+          saveData();
+          renderSettings();
+        });
+      });
+      
+      container.querySelectorAll('[data-edit-staff]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const staff = data.staff.find(s => s.id === btn.dataset.editStaff);
+          if (staff) {
+            document.getElementById('edit-staff-id').value = staff.id;
+            document.getElementById('edit-staff-position').value = staff.position || '';
+            document.getElementById('edit-staff-name').value = staff.name;
+            document.getElementById('edit-staff-phone').value = staff.phone || '';
+            document.getElementById('edit-staff-modal').classList.remove('hidden');
+          }
+        });
+      });
+    }
+
+    // Edit staff modal
+    document.getElementById('close-edit-modal').addEventListener('click', () => {
+      document.getElementById('edit-staff-modal').classList.add('hidden');
+    });
+
+    document.getElementById('save-edit-staff').addEventListener('click', () => {
+      const id = document.getElementById('edit-staff-id').value;
+      const staff = data.staff.find(s => s.id === id);
+      if (staff) {
+        staff.position = document.getElementById('edit-staff-position').value.trim();
+        staff.name = document.getElementById('edit-staff-name').value.trim();
+        staff.phone = document.getElementById('edit-staff-phone').value.trim();
+        saveData();
+        renderSettings();
+      }
+      document.getElementById('edit-staff-modal').classList.add('hidden');
+    });
+
+    // Add staff
+    document.getElementById('add-staff').addEventListener('click', () => {
+      const deptId = document.getElementById('staff-dept-select').value;
+      const position = document.getElementById('new-staff-position').value.trim();
+      const name = document.getElementById('new-staff-name').value.trim();
+      const phone = document.getElementById('new-staff-phone').value.trim();
+      
+      if (deptId && name) {
+        data.staff.push({ id: generateId(), deptId, position, name, phone });
+        saveData();
+        document.getElementById('new-staff-position').value = '';
+        document.getElementById('new-staff-name').value = '';
+        document.getElementById('new-staff-phone').value = '';
+        renderSettings();
+      }
+    });
+
+    // Status list
+    function renderStatusList() {
+      const container = document.getElementById('status-list');
+      container.innerHTML = data.statuses.map(s => `
+        <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
+          <div class="flex items-center">
+            <input type="color" value="${s.color}" data-status-color="${s.id}" class="w-8 h-6 mr-2 cursor-pointer">
+            <span>${s.name}</span>
+          </div>
+          <button class="text-red-500 hover:text-red-700 px-2" data-delete-status="${s.id}">刪除</button>
+        </div>
+      `).join('');
+      
+      container.querySelectorAll('[data-status-color]').forEach(input => {
+        input.addEventListener('change', (e) => {
+          const status = data.statuses.find(s => s.id === input.dataset.statusColor);
+          if (status) {
+            status.color = e.target.value;
+            saveData();
+          }
+        });
+      });
+      
+      container.querySelectorAll('[data-delete-status]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          data.statuses = data.statuses.filter(s => s.id !== btn.dataset.deleteStatus);
+          saveData();
+          renderSettings();
+        });
+      });
+    }
+
+    // Add status
+    document.getElementById('add-status').addEventListener('click', () => {
+      const name = document.getElementById('new-status-name').value.trim();
+      const color = document.getElementById('new-status-color').value;
+      
+      if (name) {
+        data.statuses.push({ id: generateId(), name, color });
+        saveData();
+        document.getElementById('new-status-name').value = '';
+        renderSettings();
+      }
+    });
+
+    // Holiday list
+    function renderHolidayList() {
+      const container = document.getElementById('holiday-list');
+      container.innerHTML = data.holidays.map(h => `
+        <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
+          <span>${h.date} - ${h.name}</span>
+          <button class="text-red-500 hover:text-red-700 px-2" data-delete-holiday="${h.id}">刪除</button>
+        </div>
+      `).join('');
+      
+      container.querySelectorAll('[data-delete-holiday]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          data.holidays = data.holidays.filter(h => h.id !== btn.dataset.deleteHoliday);
+          saveData();
+          renderSettings();
+        });
+      });
+    }
+
+    // Add holidays (batch)
+    document.getElementById('add-holidays').addEventListener('click', () => {
+      const input = document.getElementById('holiday-input').value.trim();
+      if (!input) return;
+      
+      const lines = input.split('\n');
+      lines.forEach(line => {
+        const parts = line.split('\t');
+        if (parts.length >= 2) {
+          const date = parts[0].trim();
+          const name = parts[1].trim();
+          if (date && name) {
+            data.holidays.push({ id: generateId(), date, name });
+          }
+        }
+      });
+      
+      saveData();
+      document.getElementById('holiday-input').value = '';
+      renderSettings();
+    });
+
+    // Weekend colors
+    document.getElementById('saturday-color').addEventListener('change', (e) => {
+      data.saturdayColor = e.target.value;
+      saveData();
+    });
+
+    document.getElementById('sunday-color').addEventListener('change', (e) => {
+      data.sundayColor = e.target.value;
+      saveData();
+    });
+
+    document.getElementById('holiday-color').addEventListener('change', (e) => {
+      data.holidayColor = e.target.value;
+      saveData();
+    });
+
+    // Export CSV
+    document.getElementById('export-csv').addEventListener('click', () => {
+      if (!currentDeptId) {
+        const toast = document.createElement('div');
+        toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow-lg z-50';
+        toast.textContent = '請先選擇部門';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
+        return;
+      }
+      
+      const monthKey = getMonthKey();
+      const daysInMonth = getDaysInMonth(currentYear, currentMonth);
+      const monthlyStaffIds = data.monthlyStaff[monthKey] || [];
+      const deptStaff = data.staff.filter(s => s.deptId === currentDeptId && monthlyStaffIds.includes(s.id));
+      const currentDept = data.departments.find(d => d.id === currentDeptId);
+      
+      let csv = '\uFEFF'; // BOM for Excel
+      
+      // Department info
+      csv += `${currentDept ? currentDept.name : ''},${currentDept ? currentDept.phone : ''}\n`;
+      csv += `${currentYear}年${currentMonth + 1}月\n\n`;
+      
+      // Header row
+      csv += '姓名';
+      for (let d = 1; d <= daysInMonth; d++) {
+        csv += `,${d}`;
+      }
+      csv += '\n';
+      
+      // Data rows
+      deptStaff.forEach(staff => {
+        csv += staff.name;
+        for (let d = 1; d <= daysInMonth; d++) {
+          const cellKey = `${monthKey}-${staff.id}-${d}`;
+          const cellData = data.scheduleData[cellKey];
+          if (cellData) {
+            const status = data.statuses.find(s => s.id === cellData.statusId);
+            csv += `,${status ? status.name : ''}`;
+          } else {
+            csv += ',';
+          }
+        }
+        csv += '\n';
+      });
+      
+      // Download
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `班表_${currentDept ? currentDept.name : ''}\_${currentYear}年${currentMonth + 1}月.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+
+    // Initialize
+    loadData();
+    renderDeptSelector();
+    renderSchedule();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9d4f753dc572f1f8',t:'MTc3MjI3Njg0My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

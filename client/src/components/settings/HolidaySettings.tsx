@@ -70,7 +70,7 @@ export function HolidaySettings() {
             onClick={handleExport}
             variant="outline"
             size="sm"
-            className="text-blue-600 border-blue-600 hover:bg-blue-50"
+              className="text-blue-600 border-blue-600 hover:bg-blue-100 font-bold"
           >
             導出 CSV
           </Button>
@@ -78,7 +78,7 @@ export function HolidaySettings() {
             onClick={() => fileInputRef.current?.click()}
             variant="outline"
             size="sm"
-            className="text-green-600 border-green-600 hover:bg-green-50"
+              className="text-green-600 border-green-600 hover:bg-green-100 font-bold"
           >
             導入 CSV
           </Button>

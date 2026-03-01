@@ -12,16 +12,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { EditStaffModal } from "../modals/EditStaffModal";
+import { exportStaffCSV, readCSVFile, importStaff } from "@/lib/csvExport";
 
 export function StaffSettings() {
-  const { data, addStaff, deleteStaff } = useSchedule();
+  const { data, addStaff, deleteStaff, importStaffList } = useSchedule();
   const [deptId, setDeptId] = useState("");
   const [position, setPosition] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAdd = () => {
     if (deptId && name.trim()) {
@@ -32,12 +34,56 @@ export function StaffSettings() {
     }
   };
 
+  const handleExport = () => {
+    exportStaffCSV(data.staff, data.departments);
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const rows = await readCSVFile(file);
+        const importedStaff = importStaff(rows, data.departments);
+        importStaffList(importedStaff);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      } catch (error) {
+        console.error("Failed to import staff:", error);
+        alert("導入失敗，請檢查文件格式");
+      }
+    }
+  };
+
   return (
     <>
       <div className="bg-white rounded-lg shadow p-4">
-        <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">
-          工作人員設定
-        </h2>
+        <div className="flex justify-between items-center mb-4 border-b pb-2">
+          <h2 className="text-lg font-bold text-gray-800">工作人員設定</h2>
+          <div className="flex space-x-2">
+            <Button
+              onClick={handleExport}
+              variant="outline"
+              size="sm"
+              className="text-blue-600 border-blue-600 hover:bg-blue-50"
+            >
+              導出 CSV
+            </Button>
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              variant="outline"
+              size="sm"
+              className="text-green-600 border-green-600 hover:bg-green-50"
+            >
+              導入 CSV
+            </Button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImport}
+              accept=".csv"
+              className="hidden"
+            />
+          </div>
+        </div>
         <div className="flex space-x-2 mb-4">
           <Select value={deptId} onValueChange={setDeptId}>
             <SelectTrigger className="border rounded px-3 py-2">

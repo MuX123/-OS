@@ -115,6 +115,12 @@ export interface ScheduleContextType {
   addHolidays: (holidays: Array<{ date: string; name: string }>) => void;
   deleteHoliday: (id: string) => void;
 
+  // Import operations
+  importStaffList: (staff: Staff[]) => void;
+  importHolidaysList: (holidays: Holiday[]) => void;
+  importStatusesList: (statuses: Status[]) => void;
+  importDepartmentsList: (departments: Department[]) => void;
+
   // Schedule operations
   setScheduleStatus: (
     staffId: string,

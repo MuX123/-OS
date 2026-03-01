@@ -5,10 +5,12 @@
 
 import { useSchedule } from "@/contexts/ScheduleContext";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { exportStatusesCSV, readCSVFile, importStatuses } from "@/lib/csvExport";
 
 export function StatusSettings() {
-  const { data, addStatus, deleteStatus, updateStatusColor } = useSchedule();
+  const { data, addStatus, deleteStatus, updateStatusColor, importStatusesList } = useSchedule();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [color, setColor] = useState("#ff9999");
 
@@ -20,11 +22,55 @@ export function StatusSettings() {
     }
   };
 
+  const handleExport = () => {
+    exportStatusesCSV(data.statuses);
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const rows = await readCSVFile(file);
+        const imported = importStatuses(rows);
+        importStatusesList(imported);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      } catch (error) {
+        console.error("Failed to import statuses:", error);
+        alert("導入失敗，請檢查文件格式");
+      }
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow p-4">
-      <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">
-        狀態設定
-      </h2>
+      <div className="flex justify-between items-center mb-4 border-b pb-2">
+        <h2 className="text-lg font-bold text-gray-800">狀態設定</h2>
+        <div className="flex space-x-2">
+          <Button
+            onClick={handleExport}
+            variant="outline"
+            size="sm"
+            className="text-blue-600 border-blue-600 hover:bg-blue-50"
+          >
+            導出 CSV
+          </Button>
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            variant="outline"
+            size="sm"
+            className="text-green-600 border-green-600 hover:bg-green-50"
+          >
+            導入 CSV
+          </Button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImport}
+            accept=".csv"
+            className="hidden"
+          />
+        </div>
+      </div>
       <div className="flex space-x-2 mb-4">
         <input
           type="text"

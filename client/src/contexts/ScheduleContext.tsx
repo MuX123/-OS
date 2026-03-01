@@ -180,6 +180,50 @@ export function ScheduleProvider({ children }: ScheduleProviderProps) {
     [data, updateData]
   );
 
+  const importStaffList = useCallback(
+    (staffList: Staff[]) => {
+      const newData = {
+        ...data,
+        staff: [...data.staff, ...staffList],
+      };
+      updateData(newData);
+    },
+    [data, updateData]
+  );
+
+  const importHolidaysList = useCallback(
+    (holidays: Holiday[]) => {
+      const newData = {
+        ...data,
+        holidays: [...data.holidays, ...holidays],
+      };
+      updateData(newData);
+    },
+    [data, updateData]
+  );
+
+  const importStatusesList = useCallback(
+    (statuses: Status[]) => {
+      const newData = {
+        ...data,
+        statuses: [...data.statuses, ...statuses],
+      };
+      updateData(newData);
+    },
+    [data, updateData]
+  );
+
+  const importDepartmentsList = useCallback(
+    (departments: Department[]) => {
+      const newData = {
+        ...data,
+        departments: [...data.departments, ...departments],
+      };
+      updateData(newData);
+    },
+    [data, updateData]
+  );
+
   // 班表操作
   const setScheduleStatus = useCallback(
     (staffId: string, day: number, statusId: string | null) => {
@@ -304,6 +348,10 @@ export function ScheduleProvider({ children }: ScheduleProviderProps) {
     updateStatusColor,
     addHolidays,
     deleteHoliday,
+    importStaffList,
+    importHolidaysList,
+    importStatusesList,
+    importDepartmentsList,
     setScheduleStatus,
     getScheduleStatus,
     setMonthlyStaff,
